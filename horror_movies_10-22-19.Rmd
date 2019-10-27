@@ -1,0 +1,73 @@
+---
+title: "Horror movies"
+author: "Josef Klafka"
+date: "10/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+require(lubridate)
+require(lme4)
+require(tidytext)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r get data}
+horror_movies <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-10-22/horror_movies.csv") 
+```
+
+A quick visualization: what are the 20 most common words in horror movie titles and plot summaries? Words like "dead", "blood" and "dark" are among the most common, as well as "house"--possibly a setting? $2$ is three times as common as $3$, suggesting fewer franchises continue past a second installment or the third movie may have a different by-line. 
+```{r common words in titles}
+horror_movies %>%
+  unnest_tokens(word, title) %>%
+  filter(!str_detect(word, "\\d{4}")) %>% # filter out the movie years
+  count(word) %>%
+  anti_join(stop_words) %>% # filter out stop words like "the" and "on"
+  arrange(desc(n)) %>%
+  slice(1:20) %>%
+  ggplot() + 
+    geom_col(aes(x = word, y = n, fill = word), show.legend = F) + 
+    theme_dark() # thematic plot background
+```
+
+Given the negative words used in horror movie titles, do their plot summaries reflect that darker tone? In the visualization below, we see that the average word sentiment scores from Afinn are mostly negative based on the plot summaries of the movies, which suggests that the movie plots tend to contain more negatively-valenced words as we expected. 
+```{r sentiment analysis on plot summaries}
+plot_sentiments <- horror_movies %>%
+  mutate(movie_id = 1:n()) %>%
+  unnest_tokens(word, plot) %>% 
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(movie_id) %>%
+  summarise(plot_sentiment = mean(value)) 
+
+plot_sentiments %>%
+  ggplot() + 
+    geom_histogram(aes(x = plot_sentiment), binwidth = .25)
+```
+
+Does budget predict ratings for US horror movies, accounting for inflation by year?
+Not really. We see from the intercept on the mixed effects model that there's a floor at around 5/10, even if you spend very little money making the movie. The fixed effect of budget at $1.8 x 10^8$ (which is fairly reliable) means that if you spend another fifty million dollars on your movie, on average it will get you another star in your average critic rating.
+
+Looking at the ggplot visualization, we see there's a lot of variation around the low-budget horror films in terms of ratings. Films made with little money can be critically acclaimed, panned or something in the middle, and this is where most horror films sit. 
+```{r }
+# first clean the data: remove NAs and extract the budget numbers and years
+us_horror <- horror_movies %>%
+  filter(release_country == "USA", !is.na(review_rating), !is.na(budget)) %>%
+  mutate(budget = parse_number(str_extract(budget, "\\(?[0-9,]+\\)?")),
+         # dates are in one of two formats: yyyy or dd-mon-yr. Exclude first for now
+         year = release_date %>% dmy() %>% year()) %>%
+  filter(!is.na(year))
+
+budg.mod <- lmer(formula = review_rating ~ budget + (1|year), data = us_horror)
+summary(budg.mod)
+
+us_horror %>%
+  filter(budget < 1e7) %>%
+  ggplot(aes(x = budget, y = review_rating)) + 
+    geom_point() + 
+    geom_smooth(se=F)
+```
+
+
+
