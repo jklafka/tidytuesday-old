@@ -1,0 +1,37 @@
+---
+title: "nyc_squirrels_10-29-19"
+author: "Josef Klafka"
+date: "11/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+require(ggmap)
+require(ggthemes)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r get data}
+nyc_squirrels <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-10-29/nyc_squirrels.csv")
+```
+
+```{r map visualizations}
+# get map boundaries from data
+nyc_box <- make_bbox(data = nyc_squirrels, lat = lat, lon = long)
+# get base map from Google Maps
+nyc_map <- get_map(location = nyc_box, source = "google", maptype = "terrain")
+
+# simple points for each sighting superimposed on the map
+ggmap(nyc_map) + 
+  geom_point(data = nyc_squirrels %>% filter(!is.na(primary_fur_color)),
+             mapping = aes(x = long, y = lat, color = primary_fur_color)) + 
+  scale_color_manual(values = c("#000000", "#E69F00", "#999999")) # illustrative colors
+
+# heatmap of squirrel sightings
+ggmap(nyc_map) + 
+  geom_bin2d(data = nyc_squirrels %>% filter(!is.na(primary_fur_color)),
+             mapping = aes(x=long, y = lat), binwidth = c(.0012, .0012)) + 
+  scale_fill_gradient(low = "#E69F00", high = "darkred") # in fall colors
+```
