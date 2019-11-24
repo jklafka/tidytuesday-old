@@ -1,0 +1,26 @@
+---
+title: "Untitled"
+author: "Josef Klafka"
+date: "11/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r get data}
+emperors <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-08-13/emperors.csv")
+```
+
+Did the emperors die of natural causes? 
+```{r causes of death}
+emperors %>% 
+  filter(!is.na(cause)) %>%
+  mutate(natural_cause = if_else(cause == "Natural Causes", "Natural Causes", "Violence")) %>%
+  ggplot(aes(x = natural_cause)) +
+    geom_bar()
+```

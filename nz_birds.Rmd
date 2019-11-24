@@ -1,0 +1,53 @@
+---
+title: "nz birds"
+author: "Josef Klafka"
+date: "11/24/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+require(tidyverse)
+require(viridis)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r read in data}
+nz_bird <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-11-19/nz_bird.csv")
+```
+
+
+Does the value of votes received by New Zealand bird species follow a Zipfian (rank-ordered negative exponential) distribution? We can think of vote rank as a number of points instead of a rank. A first vote rank corresponds to five points, a second rank is four points, and so on. 
+```{r zipfian vote value}
+bird_votes <- nz_bird %>%
+  mutate(vote = as.numeric(str_extract(vote_rank, "\\d")),
+         vote = abs(6 - vote)) %>% # value of votes
+  remove_missing(vars = c("bird_breed", "vote")) %>%
+  group_by(bird_breed) %>%
+  summarise(total = sum(vote)) %>%
+  ungroup()
+
+## get ranks
+bird_ranks <- bird_votes %>%
+  arrange(desc(total)) %>% 
+  mutate(bird_breed = as_factor(bird_breed), 
+         rank = rank(bird_breed))
+
+## seems roughly zipfian! log-scaling by rank gives us a pretty flat negative slope
+bird_ranks %>% 
+  ggplot(aes(x = rank, y = total, fill = bird_breed)) +
+    geom_col(show.legend = F) +
+    scale_y_log10() + 
+    scale_fill_viridis(discrete = T, option = 'D') + 
+    theme_bw() + 
+    theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+    xlab("NZ bird species") + 
+    ylab("Total value of votes") 
+
+## let's quantify this relationship with a linear model
+bird_ranks %>%
+  lm(formula = log(total) ~ rank) %>%
+  summary() 
+```
+It seems like the value of votes received does follow a Zipfian distribution! 
